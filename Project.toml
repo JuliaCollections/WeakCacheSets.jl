@@ -1,0 +1,13 @@
+name = "WeakCacheSets"
+uuid = "d30d5f5c-d141-4870-aa07-aabb0f5fe7d5"
+authors = ["oscarddssmith <oscar.smith@juliacomputing.com>"]
+version = "0.1.0"
+
+[compat]
+julia = "1.10"
+
+[extras]
+Test = "8dfed614-e22c-5e08-85e1-65c5234f0b40"
+
+[targets]
+test = ["Test"]
