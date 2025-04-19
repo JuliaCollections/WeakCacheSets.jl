@@ -104,10 +104,10 @@ function rehash!(h::WeakCacheSet{K}, newsz = length(h.keys)) where K
     return h
 end
 
-function sizehint!(d::Dict{T}, newsz; shrink::Bool=true) where T
+function Base.sizehint!(d::WeakCacheSet{T}, newsz; shrink::Bool=true) where T
     oldsz = length(d.slots)
     # limit new element count to max_values of the key type
-    newsz = min(max(newsz, length(d)), max_values(T)::Int)
+    newsz = min(max(newsz, length(d)), Base.max_values(T)::Int)
     # need at least 1.5n space to hold n elements
     newsz = _tablesz(cld(3 * newsz, 2))
     return (shrink ? newsz == oldsz : newsz <= oldsz) ? d : rehash!(d, newsz)
@@ -142,7 +142,7 @@ function ht_keyindex2_shorthash!(h::WeakCacheSet{K}, key) where K
                 avail = -index
             end
         elseif h.slots[index] == sh
-            k = keys[index]
+            k = keys[index].value
             if key === k || isequal(key, k)
                 return index, sh
             end
@@ -202,7 +202,7 @@ function getkey!(h::WeakCacheSet{K}, key::K) where K
     if index > 0
         foundkey = h.keys[index].value::Union{K, Nothing}
         if isnothing(foundkey)
-            @inbounds h.keys[index] = key
+            @inbounds h.keys[index] = WeakRef(key)
             return key
         end
         return foundkey
