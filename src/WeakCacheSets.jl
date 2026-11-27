@@ -194,7 +194,7 @@ function getkey!(h::WeakCacheSet{K}, key0) where K
             throw(KeyTypeError(K, key0))
         end
     end
-    getkey!(h, v0, key)
+    getkey!(h, key)
 end
 
 function getkey!(h::WeakCacheSet{K}, key::K) where K
