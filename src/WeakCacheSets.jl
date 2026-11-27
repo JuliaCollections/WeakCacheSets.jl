@@ -38,6 +38,15 @@ mutable struct WeakCacheSet{K}
     end
 end
 
+"""
+    wcs_hash(key)
+
+Hash of `key` as used internally by `WeakCacheSet`. Defaults to `hash`; key
+types that cache their hash may specialize this to reuse the cached value.
+Must always equal `hash(key)`.
+"""
+wcs_hash(x) = hash(x)
+
 # Gets 7 most significant bits from the hash (hsh), first bit is 1
 _shorthash7(hsh::UInt) = (hsh >> (8sizeof(UInt)-7))%UInt8 | 0x80
 
@@ -45,7 +54,7 @@ _shorthash7(hsh::UInt) = (hsh >> (8sizeof(UInt)-7))%UInt8 | 0x80
 #     idx - optimal position in the hash table
 #     sh::UInt8 - short hash (7 highest hash bits)
 function hashindex(key, sz)
-    hsh = hash(key)::UInt
+    hsh = wcs_hash(key)::UInt
     idx = (((hsh % Int) & (sz-1)) + 1)::Int
     return idx, _shorthash7(hsh)
 end
@@ -129,20 +138,22 @@ function ht_keyindex2_shorthash!(h::WeakCacheSet{K}, key) where K
     index, sh = hashindex(key, sz)
     avail = 0
     keys = h.keys
+    slots = h.slots
 
     @inbounds while true
-        if isslotempty(h,index)
+        s = slots[index]
+        if s == 0x00
             return (avail < 0 ? avail : -index), sh
         end
 
-        if isslotmissing(h,index)
+        k = keys[index].value
+        if isnothing(k)
             if avail == 0
                 # found an available slot, but need to keep scanning
                 # in case "key" already exists in a later collided slot.
                 avail = -index
             end
-        elseif h.slots[index] == sh
-            k = keys[index].value
+        elseif s == sh
             if key === k || isequal(key, k)
                 return index, sh
             end
@@ -158,7 +169,7 @@ function ht_keyindex2_shorthash!(h::WeakCacheSet{K}, key) where K
     maxallowed = max(maxallowedprobe, sz>>maxprobeshift)
     # Check if key is not present, may need to keep searching to find slot
     @inbounds while iter < maxallowed
-        if !isslotfilled(h,index)
+        if (slots[index] & 0x80) == 0 || isnothing(keys[index].value)
             h.maxprobe = iter
             return -index, sh
         end
@@ -171,7 +182,7 @@ function ht_keyindex2_shorthash!(h::WeakCacheSet{K}, key) where K
     return ht_keyindex2_shorthash!(h, key)
 end
 
-Base.@propagate_inbounds function _setindex!(h::WeakCacheSet, key, index, sh = _shorthash7(hash(key)))
+Base.@propagate_inbounds function _setindex!(h::WeakCacheSet, key, index, sh = _shorthash7(wcs_hash(key)))
     h.slots[index] = sh
     h.keys[index] = WeakRef(key)
     h.count += !isslotmissing(h, index)
@@ -194,7 +205,7 @@ function getkey!(h::WeakCacheSet{K}, key0) where K
             throw(KeyTypeError(K, key0))
         end
     end
-    getkey!(h, v0, key)
+    getkey!(h, key)
 end
 
 function getkey!(h::WeakCacheSet{K}, key::K) where K
