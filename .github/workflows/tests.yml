@@ -18,7 +18,10 @@ jobs:
     strategy:
       matrix:
         version:
-          - 'min'
+          # 'min' resolves to exactly 1.10.0, whose libopenlibm.so requires
+          # executable stack and fails to load on current runners. '1.10'
+          # tests the same minimum supported minor at its latest patch.
+          - '1.10'
           - '1'
           - 'pre'
     steps:
