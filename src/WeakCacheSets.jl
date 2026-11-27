@@ -129,20 +129,22 @@ function ht_keyindex2_shorthash!(h::WeakCacheSet{K}, key) where K
     index, sh = hashindex(key, sz)
     avail = 0
     keys = h.keys
+    slots = h.slots
 
     @inbounds while true
-        if isslotempty(h,index)
+        s = slots[index]
+        if s == 0x00
             return (avail < 0 ? avail : -index), sh
         end
 
-        if isslotmissing(h,index)
+        k = keys[index].value
+        if isnothing(k)
             if avail == 0
                 # found an available slot, but need to keep scanning
                 # in case "key" already exists in a later collided slot.
                 avail = -index
             end
-        elseif h.slots[index] == sh
-            k = keys[index].value
+        elseif s == sh
             if key === k || isequal(key, k)
                 return index, sh
             end
@@ -158,7 +160,7 @@ function ht_keyindex2_shorthash!(h::WeakCacheSet{K}, key) where K
     maxallowed = max(maxallowedprobe, sz>>maxprobeshift)
     # Check if key is not present, may need to keep searching to find slot
     @inbounds while iter < maxallowed
-        if !isslotfilled(h,index)
+        if (slots[index] & 0x80) == 0 || isnothing(keys[index].value)
             h.maxprobe = iter
             return -index, sh
         end
